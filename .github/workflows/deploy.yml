@@ -1,0 +1,91 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup SSH Agent
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_PRIVATE_KEY }}
+    
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to production server
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          set -e  # Exit on any error
+          
+          # Navigate to project directory
+          cd ${{ secrets.SERVER_PATH }} || {
+            echo "❌ Failed to navigate to ${{ secrets.SERVER_PATH }}"
+            exit 1
+          }
+          
+          echo "📦 Starting deployment at $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+          echo "🎵 Deploying Shakti Music Schedule Bot..."
+          
+          # Backup current state
+          git stash push -m "Auto-stash before deployment $(date -u '+%Y-%m-%d %H:%M:%S')"
+          
+          # Pull latest changes from master branch  
+          echo "🔄 Pulling latest changes from master..."
+          git pull origin master
+          
+          # Handle Python requirements
+          if [ -f "requirements.txt" ]; then
+            echo "🐍 Installing Python requirements..."
+            pip3 install -r requirements.txt
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Python requirements installed successfully"
+              echo "$(date -u '+%Y-%m-%d %H:%M:%S') UTC: Python requirements updated" >> /var/log/shakti-music-bot-deployment.log
+            else
+              echo "❌ Failed to install Python requirements"
+              echo "$(date -u '+%Y-%m-%d %H:%M:%S') UTC: Python requirements installation failed" >> /var/log/shakti-music-bot-deployment.log
+              exit 1
+            fi
+          else
+            echo "⚠️  No requirements.txt found"
+          fi
+          
+          # Restart PM2 process
+          echo "🔄 Restarting PM2 process..."
+          pm2 restart 0
+          
+          # Verify PM2 process is running
+          sleep 3
+          if pm2 show 0 | grep -q "online"; then
+            echo "✅ Schedule Bot is running successfully"
+            echo "$(date -u '+%Y-%m-%d %H:%M:%S') UTC: Deployment completed successfully" >> /var/log/shakti-music-bot-deployment.log
+          else
+            echo "❌ Schedule Bot failed to start"
+            echo "$(date -u '+%Y-%m-%d %H:%M:%S') UTC: Deployment failed - PM2 process not running" >> /var/log/shakti-music-bot-deployment.log
+            echo "📋 PM2 process details:"
+            pm2 show 0
+            echo "📋 Recent PM2 logs:"
+            pm2 logs 0 --lines 10
+            exit 1
+          fi
+        ENDSSH
+    
+    - name: Deployment status
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "🎉 Shakti Music Schedule Bot deployment completed successfully!"
+        else
+          echo "💥 Deployment failed. Check the logs above."
+        fi
