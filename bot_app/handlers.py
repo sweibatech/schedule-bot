@@ -21,8 +21,8 @@ from db.db_structure import Role, Event, Participation
 from utils.datetime_utils import week_dates, ru_date_string
 
 
-def get_role(db, role_name):
-    return db.query(Role).filter_by(name=role_name).first()
+def get_role(db_session, role_name):
+    return db_session.query(Role).filter_by(name=role_name).first()
 
 
 def get_events_for_week(db_session):
@@ -46,8 +46,8 @@ def get_events_for_week(db_session):
 
 def ensure_week_events():
     dates = week_dates()
-    with db_connect() as db:
-        existing = db.query(Event).filter(Event.date.in_(dates)).count()
+    with db_connect() as db_session:
+        existing = db_session.query(Event).filter(Event.date.in_(dates)).count()
         if existing == 0:
             for date in dates:
                 weekday = WEEKDAY_RU[date.weekday()]
@@ -59,9 +59,9 @@ def ensure_week_events():
                         time=DEFAULT_EVENT_TIMES[weekday][slot]
                     )
                     for role_name in DEFAULT_ROLES:
-                        role = get_role(db, role_name)
+                        role = get_role(db_session, role_name)
                         event.roles.append(role)
-                        db.add(event)
+                        db_session.add(event)
 
 
 def main_menu_keyboard(is_admin):
@@ -194,8 +194,8 @@ async def choose_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def choose_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _, event_id = update.callback_query.data.split("|")
     context.user_data["chosen_event_id"] = int(event_id)
-    with db_connect() as db:
-        event = db.query(Event).filter_by(id=int(event_id)).first()
+    with db_connect() as db_session:
+        event = db_session.query(Event).filter_by(id=int(event_id)).first()
     if not event:
         await update.callback_query.answer("Событие не найдено.")
         await show_main_menu(update, context)
@@ -226,9 +226,9 @@ async def choose_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_main_menu(update, context)
         return ConversationHandler.END
     event_id = context.user_data["chosen_event_id"]
-    with db_connect() as db:
+    with db_connect() as db_session:
         already = (
-            db.query(Participation)
+            db_session.query(Participation)
                 .filter_by(event_id=event_id, role_id=int(role_id), username=username)
                 .first()
         )
@@ -241,11 +241,11 @@ async def choose_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     participation = Participation(
         username=username, event_id=event_id, role_id=int(role_id)
     )
-    with db_connect() as db:
-        db.add(participation)
+    with db_connect() as db_session:
+        db_session.add(participation)
         # Notify admins
-        event = db.query(Event).filter_by(id=event_id).first()
-        role = db.query(Role).filter_by(id=int(role_id)).first()
+        event = db_session.query(Event).filter_by(id=event_id).first()
+        role = db_session.query(Role).filter_by(id=int(role_id)).first()
     text = (f"🟢 @{username} записался на событие:\n"
             f"{ru_date_string(event.date)}, {SLOT_RU[event.slot]} ({event.time})\n"
             f"Роль: {role.name if role else 'Без роли'}")
@@ -264,9 +264,9 @@ async def show_cancel_participation_menu(update: Update, context: ContextTypes.D
         await update.message.reply_text("У вас должен быть установлен username в Telegram для отмены участия.")
         await show_main_menu(update, context)
         return ConversationHandler.END
-    with db_connect() as db:
+    with db_connect() as db_session:
         parts = (
-            db.query(Participation)
+            db_session.query(Participation)
                 .join(Event)
                 .filter(Participation.username == username)
                 .order_by(Event.date, Event.slot)
@@ -296,9 +296,9 @@ async def show_cancel_participation_menu(update: Update, context: ContextTypes.D
 async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.data == "cancelall":
         username = update.effective_user.username
-        with db_connect() as db:
+        with db_connect() as db_session:
             canceled_parts = (
-                db.query(Participation)
+                db_session.query(Participation)
                     .join(Event)
                     .filter(Participation.username == username)
                     .all()
@@ -312,8 +312,8 @@ async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"{ru_date_string(event.date)}, {SLOT_RU[event.slot]} ({event.time})\n"
                 f"Роль: {role}"
             )
-        with db_connect() as db:
-            db.query(Participation).filter_by(username=username).delete()
+        with db_connect() as db_session:
+            db_session.query(Participation).filter_by(username=username).delete()
         for msg in notify_msgs:
             await notify_admins(context, msg)
         await update.callback_query.edit_message_text("Все ваши участия отменены.\n\nТекущее расписание на эту неделю:")
@@ -322,8 +322,8 @@ async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
     else:
         _, part_id = update.callback_query.data.split("|")
-        with db_connect() as db:
-            part = db.query(Participation).filter_by(id=int(part_id)).first()
+        with db_connect() as db_session:
+            part = db_session.query(Participation).filter_by(id=int(part_id)).first()
         if not part:
             await update.callback_query.answer("Запись не найдена.")
             await show_main_menu(update, context)
@@ -335,8 +335,8 @@ async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYP
         text = (f"🔴 @{username} отменил участие в событии:\n"
                 f"{ru_date_string(event.date)}, {SLOT_RU[event.slot]} ({event.time})\n"
                 f"Роль: {role}")
-        with db_connect() as db:
-            db.delete(part)
+        with db_connect() as db_session:
+            db_session.delete(part)
         await notify_admins(context, text)
         await update.callback_query.edit_message_text("Ваше участие отменено.\n\nТекущее расписание на эту неделю:")
         await send_schedule_this_week(update, context)
@@ -399,8 +399,8 @@ async def admin_edit_event_choice(update: Update, context: ContextTypes.DEFAULT_
 async def admin_set_event_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_time = update.message.text.strip()
     event_id = context.user_data.get("admin_event_id")
-    with db_connect() as db:
-        event = db.query(Event).filter_by(id=event_id).first()
+    with db_connect() as db_session:
+        event = db_session.query(Event).filter_by(id=event_id).first()
         if event:
             event.time = new_time
             await update.message.reply_text("Время события успешно изменено.")

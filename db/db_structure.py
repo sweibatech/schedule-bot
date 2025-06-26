@@ -45,9 +45,9 @@ class Participation(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
-    with db_connect() as db:
+    with db_connect() as db_session:
         for role_name in DEFAULT_ROLES:
-            role = db.query(Role).filter_by(name=role_name).first()
+            role = db_session.query(Role).filter_by(name=role_name).first()
             if not role:
                 role = Role(name=role_name)
-                db.add(role)
+                db_session.add(role)
