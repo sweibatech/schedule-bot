@@ -142,8 +142,12 @@ def main_menu_keyboard(is_admin):
     return ReplyKeyboardMarkup(kb, one_time_keyboard=True, resize_keyboard=True)
 
 def escape_markdown(text):
+    if not text:
+        return ""
     escape_chars = r"_*[]()~`>#+-=|{}.!"
-    return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", str(text))
+    text = re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", str(text))
+    text = re.sub(r'(?m)^-', r'\\-', text)
+    return text
 
 async def show_main_menu(update, context):
     is_admin = update.effective_user.id in ADMIN_IDS
@@ -172,15 +176,16 @@ def build_schedule_text(schedule):
                         for p in event.participations
                     ]
                     part_lines = [
-                        f"      - @{escape_markdown(username)}: {escape_markdown(role)}" for username, role in participations
+                        escape_markdown(f"      - @{username}: {role}")
+                        for username, role in participations
                     ]
                     participants_text = "\n".join(part_lines)
                     day_lines.append(
-                        f"  - {escape_markdown(SLOT_RU[slot])} ({escape_markdown(event.time)}):\n{participants_text}"
+                        escape_markdown(f"  - {SLOT_RU[slot]} ({event.time}):") + "\n" + participants_text
                     )
                 else:
                     day_lines.append(
-                        f"  - {escape_markdown(SLOT_RU[slot])} ({escape_markdown(event.time)})"
+                        escape_markdown(f"  - {SLOT_RU[slot]} ({event.time})")
                     )
         if day_lines:
             lines.append(f"*{escape_markdown(ru_date_string(date))}*")
