@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from datetime import datetime, timedelta
 from telegram import (
     Update,
@@ -140,6 +141,10 @@ def main_menu_keyboard(is_admin):
         kb.append([KeyboardButton("Отмена")])
     return ReplyKeyboardMarkup(kb, one_time_keyboard=True, resize_keyboard=True)
 
+def escape_markdown(text):
+    escape_chars = r"_*[]()~`>#+-=|{}.!"
+    return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", str(text))
+
 async def show_main_menu(update, context):
     is_admin = update.effective_user.id in ADMIN_IDS
     await update.effective_chat.send_message(
@@ -167,19 +172,18 @@ def build_schedule_text(schedule):
                         for p in event.participations
                     ]
                     part_lines = [
-                        f"      - @{username}: {role}" for username, role in participations
+                        f"      - @{escape_markdown(username)}: {escape_markdown(role)}" for username, role in participations
                     ]
                     participants_text = "\n".join(part_lines)
                     day_lines.append(
-                        f"  - {SLOT_RU[slot]} ({event.time}):\n{participants_text}"
+                        f"  - {escape_markdown(SLOT_RU[slot])} ({escape_markdown(event.time)}):\n{participants_text}"
                     )
                 else:
-                    # show slot even if there are no participants, but no colon or list
                     day_lines.append(
-                        f"  - {SLOT_RU[slot]} ({event.time})"
+                        f"  - {escape_markdown(SLOT_RU[slot])} ({escape_markdown(event.time)})"
                     )
         if day_lines:
-            lines.append(f"*{ru_date_string(date)}*")
+            lines.append(f"*{escape_markdown(ru_date_string(date))}*")
             lines.extend(day_lines)
     return "\n".join(lines) if lines else "Нет событий на этой неделе."
 
@@ -195,7 +199,7 @@ async def schedule_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ensure_week_events(session)
     schedule = get_events_for_week(session)
     text = build_schedule_text(schedule)
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
     session.close()
     await show_main_menu(update, context)
 
@@ -203,7 +207,7 @@ async def send_schedule_this_week(update, context):
     session = SessionLocal()
     schedule = get_events_for_week(session)
     text = build_schedule_text(schedule)
-    await update.effective_chat.send_message(text, parse_mode=ParseMode.MARKDOWN)
+    await update.effective_chat.send_message(text, parse_mode=ParseMode.MARKDOWN_V2)
     session.close()
 
 async def participate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
