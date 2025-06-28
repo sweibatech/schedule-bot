@@ -19,6 +19,7 @@ from config.settings import ADMIN_IDS, WEEKDAY_RU, DEFAULT_EVENT_NAMES, DEFAULT_
 from db.db_client import db_connect
 from db.db_structure import Role, Event, Participation
 from utils.datetime_utils import week_dates, ru_date_string
+from utils.text_utils import escape_markdown
 
 
 def get_role(db_session, role_name):
@@ -106,19 +107,19 @@ def build_schedule_text():
                             for p in event.participations
                         ]
                         part_lines = [
-                            f"      - @{username}: {role}" for username, role in participations
+                            escape_markdown(f"      - @{username}: {role}")
+                            for username, role in participations
                         ]
                         participants_text = "\n".join(part_lines)
                         day_lines.append(
-                            f"  - {SLOT_RU[slot]} ({event.time}):\n{participants_text}"
+                            escape_markdown(f"  - {SLOT_RU[slot]} ({event.time}):") + "\n" + participants_text
                         )
                     else:
-                        # show slot even if there are no participants, but no colon or list
                         day_lines.append(
-                            f"  - {SLOT_RU[slot]} ({event.time})"
+                            escape_markdown(f"  - {SLOT_RU[slot]} ({event.time})")
                         )
             if day_lines:
-                lines.append(f"*{ru_date_string(date)}*")
+                lines.append(f"*{escape_markdown(ru_date_string(date))}*")
                 lines.extend(day_lines)
     return "\n".join(lines) if lines else "Нет событий на этой неделе."
 
