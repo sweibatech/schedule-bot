@@ -135,13 +135,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def schedule_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ensure_week_events()
     text = build_schedule_text()
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
     await show_main_menu(update, context)
 
 
 async def send_schedule_this_week(update, context):
     text = build_schedule_text()
-    await update.effective_chat.send_message(text, parse_mode=ParseMode.MARKDOWN)
+    await update.effective_chat.send_message(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def participate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
