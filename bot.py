@@ -81,9 +81,8 @@ CHOOSING_DAY, CHOOSING_EVENT, CHOOSING_ROLE = range(3)
 CHOOSING_CANCEL = 100
 
 def week_dates():
-    today = datetime.today()
-    start = today - timedelta(days=today.weekday())  # Monday
-    return [(start + timedelta(days=i)).date() for i in range(7)]
+    today = datetime.today().date()
+    return [(today + timedelta(days=i)) for i in range(7)]
 
 def get_or_create_role(session, role_name):
     role = session.query(Role).filter_by(name=role_name).first()
@@ -190,7 +189,7 @@ def build_schedule_text(schedule):
         if day_lines:
             lines.append(f"*{escape_markdown(ru_date_string(date))}*")
             lines.extend(day_lines)
-    return "\n".join(lines) if lines else "Нет событий на этой неделе."
+    return "\n".join(lines) if lines else "Нет событий на ближайшие 7 дней."
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = update.effective_user.id in ADMIN_IDS
@@ -343,10 +342,14 @@ async def show_cancel_participation_menu(update: Update, context: ContextTypes.D
         await show_main_menu(update, context)
         return ConversationHandler.END
     session = SessionLocal()
+    today = datetime.today().date()
     parts = (
         session.query(Participation)
         .join(Event)
-        .filter(Participation.username == username)
+        .filter(
+            Participation.username == username,
+            Event.date >= today
+        )
         .order_by(Event.date, Event.slot)
         .all()
     )
@@ -376,10 +379,15 @@ async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYP
     if update.callback_query.data == "cancelall":
         username = update.effective_user.username
         session = SessionLocal()
+        today = datetime.today().date()
+        # Only cancel participations for events that are today or in the future
         canceled_parts = (
             session.query(Participation)
             .join(Event)
-            .filter(Participation.username == username)
+            .filter(
+                Participation.username == username,
+                Event.date >= today
+            )
             .all()
         )
         notify_msgs = []
@@ -391,7 +399,8 @@ async def cancel_participation(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"{ru_date_string(event.date)}, {SLOT_RU[event.slot]} ({event.time})\n"
                 f"Роль: {role}"
             )
-        session.query(Participation).filter_by(username=username).delete()
+        for p in canceled_parts:
+            session.delete(p)
         session.commit()
         session.close()
         for msg in notify_msgs:
