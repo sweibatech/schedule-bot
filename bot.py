@@ -107,11 +107,11 @@ def get_events_for_week(session):
 
 def ensure_week_events(session):
     dates = week_dates()
-    existing = session.query(Event).filter(Event.date.in_(dates)).count()
-    if existing == 0:
-        for date in dates:
-            weekday = WEEKDAY_RU[date.weekday()]
-            for slot in ["morning", "evening"]:
+    existing = set((e.date, e.slot) for e in session.query(Event).filter(Event.date.in_(dates)).all())
+    for date in dates:
+        weekday = WEEKDAY_RU[date.weekday()]
+        for slot in ["morning", "evening"]:
+            if (date, slot) not in existing:
                 event = Event(
                     date=date,
                     slot=slot,
@@ -122,7 +122,7 @@ def ensure_week_events(session):
                     role = get_or_create_role(session, role_name)
                     event.roles.append(role)
                 session.add(event)
-        session.commit()
+    session.commit()
 
 def ru_date_string(date):
     weekday = WEEKDAY_RU[date.weekday()]
