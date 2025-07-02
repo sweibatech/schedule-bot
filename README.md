@@ -2,25 +2,6 @@
 
 A modular, maintainable Telegram bot for managing weekly event schedules, built with Python, SQLAlchemy, and python-telegram-bot.
 
-## Folder Structure
-
-```
-project-root/
-│
-├── db_setup.py
-├── db/
-│   ├── context.py
-│   ├── dto.py
-│   └── queries.py
-├── service/
-│   └── schedule_service.py
-├── utils/
-│   └── formatting.py
-├── bot.py
-├── .env
-└── requirements.txt
-```
-
 ## Setup
 
 1. **Clone the repository**
