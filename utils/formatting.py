@@ -34,10 +34,10 @@ def ru_date_string(date_input) -> str:
     return f"{weekday}, {day} {month}"
 
 def escape_username_md2(username: str) -> str:
-    # Escapes only special characters needed for MarkdownV2 in usernames (especially _)
+    import re
     return re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', username)
 
-def build_schedule_text(event_dtos):
+def build_schedule_text(event_dtos, markdown=False):
     lines = []
     dates = week_dates()
     events_by_date = {date: [] for date in dates}
@@ -52,7 +52,7 @@ def build_schedule_text(event_dtos):
             if event:
                 if event.participations:
                     part_lines = [
-                        f"      - @{escape_username_md2(p.username)}: {p.role.name if p.role else 'Без роли'}"
+                        f"      - @{escape_username_md2(p.username) if markdown else p.username}: {p.role.name if p.role else 'Без роли'}"
                         for p in event.participations
                     ]
                     participants_text = "\n".join(part_lines)
