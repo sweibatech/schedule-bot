@@ -16,7 +16,7 @@ CHOOSING_DAY, CHOOSING_EVENT, CHOOSING_ROLE = range(3)
 async def schedule_handler(update, context):
     ensure_week_events()
     event_dtos = get_week_schedule()
-    text = build_schedule_text(event_dtos)
+    text = build_schedule_text(event_dtos, markdown=False)
     await update.message.reply_text(text)
     await show_main_menu(update, context)
 
