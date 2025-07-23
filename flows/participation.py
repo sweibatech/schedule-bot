@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ConversationHandler, CallbackQueryHandler, MessageHandler, filters
+    ConversationHandler, CallbackQueryHandler, MessageHandler, filters, CommandHandler
 )
 from shared.cancel import cancel_handler
 from shared.main_menu import show_main_menu
@@ -141,6 +141,7 @@ async def choose_role(update, context):
 
 participate_conv = ConversationHandler(
     entry_points=[
+        CommandHandler("participate", participate_handler),
         MessageHandler(filters.Regex("^Участвовать$"), participate_handler)
     ],
     states={
@@ -157,5 +158,9 @@ participate_conv = ConversationHandler(
             CallbackQueryHandler(cancel_handler, pattern="^cancel$")
         ],
     },
-    fallbacks=[MessageHandler(filters.Regex("^Отмена$"), cancel_handler)],
+    fallbacks=[
+        CommandHandler("cancel", cancel_handler),
+        MessageHandler(filters.Regex("^Отмена$"), cancel_handler)
+    ],
+    per_message=False
 )
